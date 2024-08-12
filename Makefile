@@ -14,7 +14,7 @@ $(OBJ_DIR):
 
 INC_FLAGS = $(addprefix -I,$(INC_DIR))
 CCFLAGS = $(INC_FLAGS) 
-CCFLAGS += -Wall -Wextra -Werror -Wmissing-prototypes -g -Wshadow -Wundef -Wcast-align -Wunreachable-code -O1 -std=c11 -fpic
+CCFLAGS += -Wall -Wextra -Werror -Wmissing-prototypes -g -Wshadow -Wundef -Wcast-align -Wunreachable-code -O1 -std=c11
 
 mem_pool = mem-pool/*.o
 
@@ -32,7 +32,7 @@ _OBJS = message_queue.o
 OBJS = $(patsubst %,$(OBJ_DIR)/%,$(_OBJS))
 
 $(OBJ_DIR)/%.o: $(SRC_DIR)/%.c $(OBJ_DIR)
-	$(CC) $(CCFLAGS) -c -o $@ $<
+	$(CC) $(CCFLAGS) -fpic -c -o $@ $<
 
 $(LIB) : $(mem_pool) $(OBJS)
 	$(CC) -shared -fpic -o $@ $^  -lpthread
@@ -42,6 +42,11 @@ $(STATIC_LIB) : $(mem_pool) $(OBJS)
 
 build: $(LIB) $(STATIC_LIB)
 	@echo build complete
+
+LDFLAGS = -l:libev.a -l:$(STATIC_LIB)
+example : $(STATIC_LIB)
+	$(CC) $(CCFLAGS) -c -o obj/example.o src/example.c
+	LIBRARY_PATH=. $(CC) $(CCFLAGS)  obj/example.o -o $@ $(LDFLAGS)
 
 clean: clean_submod
 	rm -rf $(OBJ_DIR)
