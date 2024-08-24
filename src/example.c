@@ -43,7 +43,7 @@ typedef struct _msg_ev_ctx_t {
     module_t        mid;
     message_queue_t *msg_que;
     ev_io           msgq_watcher;
-    ev_async        q_send_watcher;
+    ev_async        q_recv_watcher;
     ev_signal       signal_watcher;
     uint32_t        ttl;
     uint64_t        msg_1_rcv;
@@ -226,7 +226,7 @@ sigint_cb (struct ev_loop *loop, ev_signal *w, int revents)
 }
 
 static void
-q_send_cb (struct ev_loop *loop, ev_async *w, int revents)
+q_recv_cb (struct ev_loop *loop, ev_async *w, int revents)
 {
     UNUSED(w);
     UNUSED(revents);
@@ -311,11 +311,11 @@ child_thread(void* args)
 }
 
 static void 
-msg_sent_notif_cb(message_queue_t *que, void *arg)
+msg_rcv_notif_cb(message_queue_t *que, void *arg)
 {
     UNUSED(que);
     msg_ev_ctx_t *ctx = (msg_ev_ctx_t*)arg;
-    ev_async_send(ctx->loop, &ctx->q_send_watcher);
+    ev_async_send(ctx->loop, &ctx->q_recv_watcher);
 }
 
 int main(void)
@@ -332,8 +332,8 @@ int main(void)
     msg_ctx_t0.loop = main_loop;
     ev_set_userdata(main_loop, (void*)&msg_ctx_t0);
 
-    ev_async_init(&msg_ctx_t0.q_send_watcher, q_send_cb);
-    ev_async_start(main_loop, &msg_ctx_t0.q_send_watcher);
+    ev_async_init(&msg_ctx_t0.q_recv_watcher, q_recv_cb);
+    ev_async_start(main_loop, &msg_ctx_t0.q_recv_watcher);
 
     /* 
      * Initialize message queue with:
@@ -347,20 +347,20 @@ int main(void)
      *       queue-id equal to mod_0;
      *       queue depth equal to 512, i.e. buffer up to 512 messages;
      *       not using the embedded eventfd, but the external 
-     *       msg_sent_notif_cb for message notification. When a message
+     *       msg_rcv_notif_cb for message notification. When a message
      *       is sent to this queue, the callback is invoked. 
-     *       msg_sent_notif_cb calls ev_async_send to notify the ev-loop
+     *       msg_rcv_notif_cb calls ev_async_send to notify the ev-loop
      *       of this thread. 
      */
     msg_ctx_t0.msg_que = message_queue_new(msg_ctx_t0.mid, 512, 
-                               msg_sent_notif_cb, &msg_ctx_t0);
+                               msg_rcv_notif_cb, &msg_ctx_t0);
     if (!msg_ctx_t0.msg_que) {
         fprintf(stderr, "Fail to create message queue\n");
         return -1;
     }
 
-    /* Init signal but don't start it at this moment */
     ev_signal_init(&msg_ctx_t0.signal_watcher, sigint_cb, SIGINT);
+    ev_signal_start(main_loop, &msg_ctx_t0.signal_watcher);
 
     pthread_create(&t1, NULL, child_thread, (void*)&num1);
     pthread_create(&t2, NULL, child_thread, (void*)&num2);
@@ -371,9 +371,6 @@ int main(void)
     while (child_thread_ready < mod_max -1) {
         sched_yield();
     }
-
-    /* Start signal & event here */
-    ev_signal_start(main_loop, &msg_ctx_t0.signal_watcher);
 
     printf("Press CTRL-C to exit. \n");
     ev_run(main_loop, 0);
