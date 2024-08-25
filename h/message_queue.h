@@ -21,6 +21,7 @@ typedef struct _message_header_t {
 
 #define MSG_TYPE(m)  ((m)->message_type)
 #define MSG_SIZE(m)  ((m)->message_length)
+#define MSG_SRC(m)   ((m)->src_id)
 
 #define MSG_MAGIC   0xDEADBEEF
 
