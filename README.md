@@ -5,6 +5,7 @@ Example code is based on libev. It creates 3 threads and illustrates how to send
 
 ## Build
 
+    apt install libev-dev
     git clone https://github.com/sh4run/message_queue.git
     cd message_queue
     git submodule update --init
